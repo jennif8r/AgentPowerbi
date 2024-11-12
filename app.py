@@ -1,14 +1,15 @@
 from azure.identity import InteractiveBrowserCredential
-from azure.core.credentials import TokenCredential
+from azure.core.credentials import TokenCredential  
+from langchain_community.agent_toolkits import PowerBIToolkit, create_pbi_agent
 from langchain_community.utilities.powerbi import PowerBIDataset
-from langchain_community.agent_toolkits import PowerBIToolkit
-from langchain_community.vectorstores import FAISS
-from langchain_cohere import CohereEmbeddings, ChatCohere
+from langchain_cohere import ChatCohere
 import requests
 
-# Dicionário de perguntas predefinidas e suas consultas DAX correspondentes
-predefined_queries = {
-    "Quantas vezes o bairro 'Cajuru' aparece na base de dados na coluna 'bairro'?": """
+few_shots = """
+1- ###Question:## Quantas vezes o bairro Cajuru aparece na base de dados?
+###Resposta:### a query DAX que responde essa pergunta 
+'
+
 EVALUATE
 ROW(
     "Total Cajuru", 
@@ -18,21 +19,42 @@ ROW(
             'public covid19'[bairro] = "CAJURU"
         )
     )
-)
-"""
-}
+)'.
 
+
+2- ###Question:## Quantas vezes o centro aparece na base de dados?
+###Resposta:### a query DAX que responde essa pergunta:
+'
+
+EVALUATE
+ROW(
+    "Total Centro", 
+    COUNTROWS(
+        FILTER(
+            'public covid19',
+            'public covid19'[bairro] = "CENTRO"
+        )
+    )
+)'.
+
+"""
 # Definir IDs do workspace e dataset do Power BI
 workspace_id = 'f2b8d789-ed55-4a47-a19c-d2ac79dea041'
 dataset_id = '3298ff60-f72f-48de-81fb-f5bf3a4c2bcf'
 
-cohere_api_key = 'key'
-# Inicialização do modelo LLM com chave da Cohere
-fast_llm = ChatCohere(
-    model_name="command-r-plus",
-    verbose=True,
-    cohere_api_key=cohere_api_key
+# Inicialização dos modelos LLM com chaves da OpenAI
+fast_llm = ChatCohere( 
+    model_name="command-r-plus", 
+    verbose=True, 
+    cohere_api_key='HcOn9LIjD4MztBiwoKXGdz0Ci2JeqwOd1VhRohAJ'
 )
+
+smart_llm = ChatCohere(
+    model_name="command-r-plus", 
+    verbose=True,
+    cohere_api_key='HcOn9LIjD4MztBiwoKXGdz0Ci2JeqwOd1VhRohAJ'
+)
+
 
 # Autenticação interativa via navegador
 credential = InteractiveBrowserCredential()
@@ -56,61 +78,31 @@ dataset_response = requests.get(datasets_url, headers=headers)
 if dataset_response.status_code == 200:
     print("Autenticação bem-sucedida. Continuando com a execução...")
 
-    # Inicializar o PowerBIDataset
-    powerbi_dataset = PowerBIDataset(
-        dataset_id=dataset_id,
-        table_names=["public covid19"],
-        credential=credential
-    )
-
-  # Inicializar o toolkit
+    # Resolver a referência do campo `credential` no PowerBIDataset
+    PowerBIDataset.update_forward_refs(TokenCredential=TokenCredential)
+    
     toolkit = PowerBIToolkit(
-        powerbi=powerbi_dataset,
-        llm=fast_llm
-    )
+            powerbi=PowerBIDataset(
+                dataset_id=dataset_id,
+                table_names=["public covid19"],  
+                credential=credential
+            ),
+            llm=smart_llm,
+            examples=few_shots,
+            output_token_limit=1000,
+        )
+    
+    agent_executor = create_pbi_agent(
+            llm=fast_llm,
+            toolkit=toolkit,
+            verbose=True,
+            max_itarations=5,
+       )
+    # Exemplos de consultas que o agente pode executar
+    result = agent_executor.run("Quantas vezes o cajuru aparece na base de dados")
+    print("Resposta:", result)
 
-# Obter a ferramenta 'query_dax' do toolkit
-    tools = toolkit.get_tools()
-    query_dax_tool = None
-    for tool in tools:
-        if tool.name == 'query_dax':
-            query_dax_tool = tool
-            break
-
-    if query_dax_tool is None:
-        print("Erro: A ferramenta 'query_dax' não foi encontrada no toolkit.")
-        exit()
-        
-    # Criar embeddings das perguntas predefinidas
-    embeddings = CohereEmbeddings(
-    model="embed-multilingual-v3.0",
-    cohere_api_key=cohere_api_key
-    )
-
-    predefined_questions = list(predefined_queries.keys())
-    vectorstore = FAISS.from_texts(predefined_questions, embeddings)
-
-    def get_matching_query(question, vectorstore, predefined_queries):
-        similar_docs = vectorstore.similarity_search(question, k=1)
-        if similar_docs:
-            matched_question = similar_docs[0].page_content
-            dax_query = predefined_queries[matched_question]
-            return dax_query
-        return None
-
-    # Exemplo de pergunta do usuário
-    user_question = "Quantas vezes o bairro 'Cajuru' aparece na base de dados na coluna 'bairro'?"
-
-    # Obter a consulta DAX correspondente
-    dax_query = get_matching_query(user_question, vectorstore, predefined_queries)
-
-    if dax_query:
-        # Executar a consulta DAX usando o PowerBIDataset
-        result = query_dax_tool.run(dax_query)
-        print("Resposta:", result)
-    else:
-        print("A informação solicitada não existe.")
-
+    
 else:
     print(f"Falha na autenticação: {dataset_response.status_code}")
     print("Detalhes da resposta:", dataset_response.text)
