@@ -1,0 +1,8 @@
+azure-identity
+azure-core
+langchain
+langchain-cohere
+requests
+cohere
+langchain-community
+faiss-cpu
