@@ -1,44 +1,165 @@
-# AgentPowerbi
-Agent de powerbi que está com few-shot para responder questions sobre o dataset
+# 🤖 Agent Power BI (Chat2DAX)
+> Interface conversacional inteligente baseada em LangChain para geração autônoma de consultas DAX em linguagem natural a partir de datasets do Power BI.
 
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![LangChain](https://img.shields.io/badge/LangChain-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white)
+![Microsoft Azure](https://img.shields.io/badge/Entra_ID_(Azure)-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white)
+![Power BI](https://img.shields.io/badge/Power_BI_Premium-F2C811?style=for-the-badge&logo=powerbi&logoColor=black)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
 
-#Descrição
-Estou utilizando o Agent do LangChain, um framework que permite integrações específicas, como com o Power BI e DAX. (Link do framework: https://python.langchain.com/docs/integrations/tools/powerbi/). Esse Agent foi desenvolvido em inglês e tem um contexto focado em Power BI e DAX, permitindo realizar consultas usando DAX para buscar informações relevantes.
+---
 
-Configuração do Ambiente
-Para habilitar o uso desse Agent, precisei configurar um usuário no Entra ID (antigo Azure Active Directory) e conceder as permissões necessárias para que ele possa acessar e consultar dados do Power BI via API REST. Esse usuário tem acesso ao Power BI Premium e ao workspace que criei, onde está configurado um dataset com conexão DirectQuery.
+## 📖 Visão Geral
 
-Estabeleci a conexão entre o Python e o Power BI incluindo o ID do dataset e o nome da tabela onde o Agent realizará consultas DAX para responder às perguntas dos usuários. Utilizei dados públicos sobre a Covid-19, disponibilizados pelo site da prefeitura de Curitiba (link: https://www.curitiba.pr.gov.br/dadosabertos/busca/?grupo=16), que foram armazenados em um banco de dados PostgreSQL em um servidor próprio.
+A principal dor na análise de dados corporativos é a dependência de dashboards estáticos e o gargalo das equipes técnicas para responder perguntas específicas.
 
-Testes Iniciais com o LangChain e OpenAI
-Após configurar o banco de dados, o Power BI e o Entra ID, testei o Agent do LangChain com os modelos de linguagem da OpenAI (GPT-3.5 Turbo e GPT-4.0). Consegui realizar algumas consultas DAX e obter respostas para perguntas, mas, devido ao crédito limitado, não consegui realizar muitos testes para aprimoramento.
+**E se executivos pudessem simplesmente conversar com os dados?**
 
-Alternativa com a API do Cohere (https://cohere.com/)
-Para continuar os testes, optei por usar a API do Cohere, que oferece um modelo open-source. No entanto, encontrei uma limitação: o modelo permite apenas 10 requisições por minuto, o que é insuficiente, pois meu sistema realiza diversas requisições numa cadeia de pensamento entre dois Agents. Para contornar essa limitação, implementei as seguintes melhorias:
+Este projeto é uma **Prova de Conceito (PoC)** que integra:
+- Toolkits do LangChain para Power BI  
+- Modelos de linguagem (LLMs)  
+- APIs REST do Azure  
 
-- Técnica de Few-Shot Prompt: Em vez de utilizar a técnica zero-shot (onde não são fornecidos exemplos), adotei a técnica de few-shot, fornecendo exemplos de perguntas e respostas DAX no prompt para direcionar o modelo a um desempenho mais preciso.
+O Agent atua como um **engenheiro de dados virtual**, capaz de:
+- Interpretar linguagem natural  
+- Planejar consultas  
+- Gerar código DAX  
+- Executar queries automaticamente  
 
-- Limite de Requisições por Agent: Configurei o código para limitar cada Agent a cinco requisições, evitando exceder o limite imposto pela API do Cohere.
+---
 
-Atualmente, estou na fase de tentativa e erro, ajustando o código para garantir que o modelo traga resultados satisfatórios em português, pois, até agora, ele responde em inglês.
+## 🏗️ Arquitetura do Sistema
 
+```mermaid
+graph TD
+    A[👤 Usuário Executivo] -->|Pergunta natural| B(🤖 Agent LangChain)
+    B -->|Raciocínio multi-step| C{🛠️ Prompting & Regras}
+    C -->|Few-shot context| D[🧠 LLM - Cohere/OpenAI]
+    D -->|Gera DAX| B
+    B -->|HTTP + OAuth| E(☁️ Entra ID)
+    E -->|Token| F[📊 Power BI Premium]
+    F -->|DirectQuery| G[(🐘 PostgreSQL)]
+    G -->|Resposta| B
+    B -->|Síntese final| A
+```
 
-#Ambiente Controlado e Dados Públicos:#
-Estou utilizando meu notebook pessoal para esse projeto, e todos os dados são públicos, obtidos através do site da prefeitura de Curitiba.
+---
 
-#Acesso Temporário com Conta premium da azure por 30 dias:#
-Com a conta, consegui um acesso de 30 dias para testar as ferramentas da Microsoft, que oferecem R$ 1.080,00 em créditos para uso nesse período. Com esses créditos:
+## ⚙️ Infraestrutura e Configuração
 
-- Ativei o Power BI Premium por 30 dias.
-- Configurei um servidor para hospedar um banco de dados PostgreSQL.
-- Ativei o Microsoft Entra ID (antigo Active Directory) para gerenciar permissões e acessos.
+### 🔐 Identidade e Segurança
+- Autenticação via Microsoft Entra ID
+- Acesso programático M2M (Machine-to-Machine)
+- Permissões granulares para API do Power BI
 
-#Uso de LLM Open Source (Cohere) para Testes:#
-Estou utilizando a API de um modelo de LLM open source da Cohere. Como essa ferramenta é para testes, aceitei o contrato que permite o uso dos dados para o treinamento do modelo, já que não há informações sensíveis envolvidas.
+### 📊 Camada Semântica
+- Dataset hospedado em Power BI Premium
+- Workspace na nuvem Microsoft
 
-#Planos para Ambiente Empresarial Seguro:#
-Para o ambiente da empresa, o modelo deverá ser ajustado:
+### 🗄️ Dados
+- Banco relacional em PostgreSQL
+- Integração via DirectQuery
+- Execução dinâmica de consultas DAX
 
-- Será necessária uma API da Google, openAi ou outra a escolha acredito que google pois ate onde tenho conhecimento é o que já está sendo utilizada na empresa, configurada com uma conta empresarial.
-- O contrato da API deverá garantir que os dados não serão utilizados para treinamento, o que é um requisito essencial para manter a segurança e a privacidade.
-- Em um ambiente empresarial, não utilizaremos o modelo open source da Cohere, e sim uma LLM com contrato que assegure que os dados fornecidos não serão usados para treinamento.
+### 📚 Dataset de Estudo
+- Dados públicos de COVID-19 da Prefeitura de Curitiba  
+- Processamento local em ambiente controlado  
+- Nenhum dado sensível utilizado  
+
+---
+
+## 🧠 Engenharia de Prompt & Modelos
+
+### 🔄 Evolução dos Modelos
+- Inicial: OpenAI (GPT-3.5 / GPT-4)  
+- Problema: custo e consumo de tokens em loops  
+- Solução: migração para Cohere  
+
+---
+
+### ⚠️ Desafios Encontrados
+
+#### Rate Limiting
+- Limite: 10 requisições/minuto
+- Impacto: falhas no Agent
+
+#### Solução: Multi-Agent Controlado
+- Limite de iterações (max_iterations = 5)
+- Redução de loops desnecessários
+- Maior estabilidade
+
+---
+
+### 🎯 Prompt Engineering
+
+#### ❌ Zero-shot
+- Respostas genéricas  
+- Baixa precisão em DAX  
+
+#### ✅ Few-shot
+- Exemplos estruturados  
+- Contexto técnico embutido  
+- Maior assertividade na primeira execução  
+
+---
+
+### 🌐 Desafio Atual
+- Latência multilíngue  
+- Raciocínio interno em inglês  
+- Interface final em português (pt-BR)  
+
+---
+
+## 💻 Ambiente de Testes
+
+Infraestrutura baseada em créditos Azure (trial):
+
+- Orçamento: R$ 1080  
+- Período limitado  
+
+### Recursos utilizados:
+- Power BI Premium  
+- PostgreSQL dedicado  
+- Integração com Entra ID  
+- Ambiente isolado (sandbox)  
+
+### 🔐 Segurança dos Dados
+- Apenas dados públicos  
+- Sem risco de vazamento  
+- Compatível com uso de LLMs abertas  
+
+---
+
+## 🚀 Roadmap para Ambiente Enterprise
+
+### 🔄 Troca de Provider LLM
+- Remoção de modelos open/shared  
+- Uso de:
+  - Azure OpenAI (Private Endpoint)  
+  - Google Vertex AI  
+
+---
+
+### 🔒 Governança e Segurança
+- SLAs formais de LLM  
+- Opt-out de retenção de dados  
+- Zero uso de dados para treinamento  
+- Isolamento completo de queries  
+
+---
+
+### ⚙️ MLOps e Compliance
+- Pipeline controlado  
+- Auditoria de queries  
+- Monitoramento de uso  
+- Controle de custos  
+
+---
+
+## 💡 Status do Projeto
+
+🚧 Em evolução contínua com foco em:
+- Performance  
+- Redução de latência  
+- Melhor UX conversacional  
+- Robustez empresarial  
